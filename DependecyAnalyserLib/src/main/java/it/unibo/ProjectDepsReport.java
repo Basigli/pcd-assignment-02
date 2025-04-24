@@ -3,17 +3,16 @@ package it.unibo;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ClassDepsReport implements Report {
-    private ArrayList<String> classDependencies;
+public class ProjectDepsReport implements Report{
+
+    private ArrayList<String> projectDependencies;
     @Override
     public List<String> getList() {
-        return classDependencies;
+        return projectDependencies;
     }
 
     @Override
     public void setList(ArrayList<String> declarations) {
-        this.classDependencies = declarations;
+        this.projectDependencies = declarations;
     }
-
-
 }

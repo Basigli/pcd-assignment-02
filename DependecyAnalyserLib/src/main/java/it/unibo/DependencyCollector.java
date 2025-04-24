@@ -7,11 +7,9 @@ import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
 import java.util.List;
 
 public class DependencyCollector extends VoidVisitorAdapter<List<String>> {
-
     @Override
     public void visit(ClassOrInterfaceType declaration, List<String> collector) {
         super.visit(declaration, collector);
         collector.add(declaration.getNameAsString());
     }
-
 }
