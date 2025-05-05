@@ -1,0 +1,44 @@
+package it.unibo.vertx.verticles;
+
+import io.vertx.core.AbstractVerticle;
+import io.vertx.core.Future;
+import io.vertx.core.Promise;
+import it.unibo.vertx.DependecyAnalyserLib;
+import it.unibo.vertx.reports.ClassDepsReport;
+import it.unibo.vertx.reports.PackageDepsReport;
+
+public class PackageDepencyAnalyser extends AbstractVerticle {
+    private final Promise<PackageDepsReport> promise;
+    private final String packageSrcFolder;
+
+    public PackageDepencyAnalyser(String packageSrcFolder, Promise<PackageDepsReport> promise) {
+        this.promise = promise;
+        this.packageSrcFolder = packageSrcFolder;
+    }
+
+
+    @Override
+    public void start() {
+        System.out.println("PackageDepencyAnalyser started");
+        vertx.fileSystem().readDir(packageSrcFolder)
+                .onSuccess(files -> {
+                    PackageDepsReport report = new PackageDepsReport();
+                    report.setPackageName(packageSrcFolder);
+                    var futures = files.stream()
+                            .map(file -> DependecyAnalyserLib.getClassDependencies(file, vertx)
+                                    .onSuccess(report::addPackageDependency)
+                                    .onFailure(err -> System.err.println("Failed to get class dependencies: " + err.getMessage())))
+                            .toList();
+                    Future.all(futures)
+                            .onSuccess(res -> promise.complete(report))
+                            .onFailure(err -> {
+                                System.err.println("Failed to analyze package dependencies: " + err.getMessage());
+                                promise.fail(err);
+                            });
+                })
+                .onFailure(err -> {
+                    System.err.println("File reading failed: " + err.getMessage());
+                    promise.fail(err);
+                });
+    }
+}
