@@ -13,9 +13,11 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.io.File;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
+
 import com.mxgraph.swing.mxGraphComponent;
 import com.mxgraph.view.mxGraph;
-import it.unibo.vertx.DependencyCollector;
+import it.unibo.rxjava.DependencyCollector;
 import it.unibo.vertx.reports.ClassDepsReport;
 
 public class DependencyAnalyserApp {
@@ -106,7 +108,7 @@ public class DependencyAnalyserApp {
                     emitter.onComplete();
                 })
                 .subscribeOn(Schedulers.io())
-                .flatMap(file -> Observable.fromCallable(() -> parseAndCollect(file)))
+                .flatMap(this::parseAndCollect) // Use the updated parseAndCollect method
                 .observeOn(Schedulers.single())
                 .subscribe(result -> {
                     SwingUtilities.invokeLater(() -> {
@@ -163,9 +165,17 @@ public class DependencyAnalyserApp {
                 scanDirectory(file, emitter);
             } else if (file.getName().endsWith(".java")) {
                 emitter.onNext(file);
+                try {
+                    // Introduce a delay of 500 milliseconds
+                    TimeUnit.MILLISECONDS.sleep(500);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Thread interrupted during delay", e);
+                }
             }
         }
     }
+    /*
     private ClassDepsReport parseAndCollect(File file) throws Exception {
         System.out.println("Parsing file: " + file.getAbsolutePath());
         System.out.println("Collecting dependencies...");
@@ -179,5 +189,38 @@ public class DependencyAnalyserApp {
         report.setClassName(className);
         report.setClassDependencies(dependencies);
         return report;
+    }
+    */
+    private Observable<ClassDepsReport> parseAndCollect(File file) {
+        return Observable.create(emitter -> {
+            try {
+                System.out.println("Parsing file: " + file.getAbsolutePath());
+                CompilationUnit cu = StaticJavaParser.parse(file);
+
+                // Create a DependencyCollector and an Observable to collect dependencies
+                Observable<String> dependenciesObservable = Observable.create(depEmitter -> {
+                    DependencyCollector collector = new DependencyCollector();
+                    collector.visit(cu, depEmitter);
+                    depEmitter.onComplete();
+                });
+
+                // Collect dependencies into a HashSet
+                HashSet<String> dependencies = new HashSet<>();
+                dependenciesObservable
+                        .delay(300, TimeUnit.MILLISECONDS)
+                        .subscribe(dependencies::add, emitter::onError, () -> {
+                            // Create ClassDepsReport
+                            String className = cu.getPrimaryTypeName().orElse(file.getName());
+                            ClassDepsReport report = new ClassDepsReport();
+                            report.setClassName(className);
+                            report.setClassDependencies(dependencies);
+
+                            // Emit the report
+                            emitter.onNext(report);
+                        });
+            } catch (Exception e) {
+                emitter.onError(e);
+            }
+        });
     }
 }
