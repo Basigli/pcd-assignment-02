@@ -105,11 +105,11 @@ public class DependencyAnalyserApp {
 
         Observable.<File>create(emitter -> {
                     scanDirectory(new File(root), emitter);
-                    emitter.onComplete();
                 })
                 .subscribeOn(Schedulers.io())
                 .flatMap(this::parseAndCollect) // Use the updated parseAndCollect method
                 .observeOn(Schedulers.single())
+                .concatMap(file -> Observable.just(file).delay(1000, TimeUnit.MILLISECONDS))
                 .subscribe(result -> {
                     SwingUtilities.invokeLater(() -> {
                         addNode(result.getClassName());
@@ -165,13 +165,6 @@ public class DependencyAnalyserApp {
                 scanDirectory(file, emitter);
             } else if (file.getName().endsWith(".java")) {
                 emitter.onNext(file);
-                try {
-                    // Introduce a delay of 500 milliseconds
-                    TimeUnit.MILLISECONDS.sleep(500);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new RuntimeException("Thread interrupted during delay", e);
-                }
             }
         }
     }
@@ -194,7 +187,7 @@ public class DependencyAnalyserApp {
     private Observable<ClassDepsReport> parseAndCollect(File file) {
         return Observable.create(emitter -> {
             try {
-                System.out.println("Parsing file: " + file.getAbsolutePath());
+                log("Parsing file: " + file.getAbsolutePath());
                 CompilationUnit cu = StaticJavaParser.parse(file);
 
                 // Create a DependencyCollector and an Observable to collect dependencies
@@ -203,11 +196,11 @@ public class DependencyAnalyserApp {
                     collector.visit(cu, depEmitter);
                     depEmitter.onComplete();
                 });
-
+                log("Collecting dependencies...");
                 // Collect dependencies into a HashSet
                 HashSet<String> dependencies = new HashSet<>();
                 dependenciesObservable
-                        .delay(300, TimeUnit.MILLISECONDS)
+                        //.subscribeOn(Schedulers.computation())    // Use computation scheduler for CPU-bound work
                         .subscribe(dependencies::add, emitter::onError, () -> {
                             // Create ClassDepsReport
                             String className = cu.getPrimaryTypeName().orElse(file.getName());
@@ -223,4 +216,8 @@ public class DependencyAnalyserApp {
             }
         });
     }
+    static private void log(String msg) {
+        System.out.println("[ " + Thread.currentThread().getName() + "  ] " + msg);
+    }
+
 }
