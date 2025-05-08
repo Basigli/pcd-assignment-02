@@ -6,6 +6,9 @@ import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import it.unibo.vertx.reports.ProjectDepsReport;
 import it.unibo.vertx.DependecyAnalyserLib;
+
+import java.util.stream.Stream;
+
 public class ProjectDependencyAnalyser extends AbstractVerticle {
     private final Promise<ProjectDepsReport> promise;
     private final String projectSrcFolder;
@@ -23,10 +26,26 @@ public class ProjectDependencyAnalyser extends AbstractVerticle {
                     report.setProjectName(projectSrcFolder);
 
                     var futures = files.stream()
-                            .map(file -> DependecyAnalyserLib.getPackageDependencies(file, vertx)
-                                    .onSuccess(report::addProjectDependency)
-                                    .onFailure(err -> System.err.println("Failed to get package dependencies: " + err.getMessage())))
+                            .filter(file -> vertx.fileSystem().propsBlocking(file).isDirectory())
+                            .flatMap(file -> {
+                                // Call both getPackageDependencies and getProjectDependencies
+                                var packageFuture = DependecyAnalyserLib.getPackageDependencies(file, vertx)
+                                        .onSuccess(report::addProjectDependency)
+                                        .onFailure(err -> System.err.println("Failed to get package dependencies: " + err.getMessage()));
+
+                                var projectFuture = DependecyAnalyserLib.getProjectDependencies(file, vertx)
+                                        .onSuccess(dependencies -> {
+                                            dependencies.getProjectDependencies().forEach(dep -> {
+                                                report.addProjectDependency(dep);
+                                                System.out.println("Added project dependency: " + dep.getPackageName());
+                                            });
+                                        })
+                                        .onFailure(err -> System.err.println("Failed to get project dependencies: " + err.getMessage()));
+
+                                return Stream.of(packageFuture, projectFuture);
+                            })
                             .toList();
+
                     Future.all(futures)
                             .onSuccess(res -> promise.complete(report))
                             .onFailure(err -> {

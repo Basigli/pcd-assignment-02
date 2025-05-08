@@ -12,9 +12,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class App {
-    private static final String FILE_PATH = "DependecyAnalyserLib/src/main/java/it/unibo/vertx/reports/ClassDepsReport.java";
-    private static final String PACKAGE_PATH = "DependecyAnalyserLib/src/main/java/it/unibo/vertx/reports";
-    private static final String PROJECT_PATH = "DependecyAnalyserLib/src/main/java/it/unibo/vertx";
+
+    private static final String PACKAGE_PATH = "DependecyAnalyserLib/src/test/java/it/unibo";
+    // private static final String PROJECT_PATH = "DependecyAnalyserLib/main/java/it/unibo/vertx";
+    private static final String PROJECT_PATH = "DependecyAnalyserLib";
+    private static final String FILE_PATH = "DependecyAnalyserLib/src/test/java/it/unibo/A.java";
+
     public static void main(String[] args) {
         Vertx vertx = Vertx.vertx();
 
@@ -26,7 +29,8 @@ public class App {
                 System.err.println("Failed to get class dependencies: " + result.cause());
             }
         });
-
+        */
+        /*
         DependecyAnalyserLib.getPackageDependencies(PACKAGE_PATH, vertx).onComplete(result -> {
             if (result.succeeded()) {
                 System.out.println(result.result().toString());
@@ -35,6 +39,7 @@ public class App {
             }
         });
         */
+
         DependecyAnalyserLib.getProjectDependencies(PROJECT_PATH, vertx).onComplete(result -> {
             if (result.succeeded()) {
                 System.out.println(result.result().toString());
@@ -42,8 +47,6 @@ public class App {
                 System.err.println("Failed to get project dependencies: " + result.cause());
             }
         });
-
-
 
 
     }
