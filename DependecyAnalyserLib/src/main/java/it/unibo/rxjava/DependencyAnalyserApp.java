@@ -109,9 +109,9 @@ public class DependencyAnalyserApp {
                     scanDirectory(new File(root), emitter);
                 })
                 .subscribeOn(Schedulers.io())
-                .flatMap(this::parseAndCollect) // Use the updated parseAndCollect method
+                .flatMap(this::parseAndCollect)
                 .observeOn(Schedulers.single())
-                .concatMap(file -> Observable.just(file).delay(1000, TimeUnit.MILLISECONDS))
+                .concatMap(file -> Observable.just(file).delay(300, TimeUnit.MILLISECONDS))
                 .subscribe(result -> {
                     SwingUtilities.invokeLater(() -> {
                         addNode(result.getClassName());
@@ -143,20 +143,7 @@ public class DependencyAnalyserApp {
         mxHierarchicalLayout layout = new mxHierarchicalLayout(graph);
         layout.execute(parent);
     }
-    /*
-    private void addEdge(String from, String to) {
-        Object v1 = nodeMap.get(from);
-        Object v2 = nodeMap.get(to);
-        if (v1 != null && v2 != null) {
-            graph.getModel().beginUpdate();
-            try {
-                graph.insertEdge(parent, null, "", v1, v2);
-            } finally {
-                graph.getModel().endUpdate();
-            }
-        }
-    }
-    */
+
     private void addEdge(String from, String to) {
         String edgeKey = from + "->" + to;
         if (existingEdges.contains(edgeKey)) return;
@@ -187,55 +174,7 @@ public class DependencyAnalyserApp {
             }
         }
     }
-    /*
-    private ClassDepsReport parseAndCollect(File file) throws Exception {
-        System.out.println("Parsing file: " + file.getAbsolutePath());
-        System.out.println("Collecting dependencies...");
-        CompilationUnit cu = StaticJavaParser.parse(file);
-        HashSet<String> dependencies = new HashSet<>();
-        var visitor = new DependencyCollector();
-        visitor.visit(cu, dependencies);
-        System.out.println("Found dependencies: " + dependencies);
-        String className = cu.getPrimaryTypeName().orElse(file.getName());
-        ClassDepsReport report = new ClassDepsReport();
-        report.setClassName(className);
-        report.setClassDependencies(dependencies);
-        return report;
-    }
-    */
-    /*
-    private Observable<ClassDepsReport> parseAndCollect(File file) {
-        return Observable.create(emitter -> {
-            try {
-                log("Parsing file: " + file.getAbsolutePath());
-                CompilationUnit cu = StaticJavaParser.parse(file);
 
-                // Create a ClassDepsReport instance
-                String className = cu.getPrimaryTypeName().orElse(file.getName());
-                ClassDepsReport report = new ClassDepsReport();
-                report.setClassName(className);
-
-                // Create a DependencyCollector and an Observable to collect dependencies
-                Observable<String> dependenciesObservable = Observable.create(depEmitter -> {
-                    DependencyCollector collector = new DependencyCollector();
-                    collector.visit(cu, depEmitter);
-                    depEmitter.onComplete();
-                });
-
-                log("Collecting dependencies...");
-                // Add dependencies incrementally
-                dependenciesObservable
-                        .concatMap(dep -> Observable.just(dep).delay(300, TimeUnit.MILLISECONDS))
-                        .subscribe(report::addClassDependency, emitter::onError, () -> {
-                            emitter.onNext(report);
-                        });
-            } catch (Exception e) {
-                emitter.onError(e);
-            }
-        });
-    }
-
-     */
     static private void log(String msg) {
         System.out.println("[ " + Thread.currentThread().getName() + "  ] " + msg);
     }
