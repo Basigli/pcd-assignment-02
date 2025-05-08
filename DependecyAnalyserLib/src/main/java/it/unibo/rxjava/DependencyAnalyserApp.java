@@ -1,38 +1,22 @@
 package it.unibo.rxjava;
 
-
-import com.github.javaparser.StaticJavaParser;
-import com.github.javaparser.ast.CompilationUnit;
-import com.mxgraph.layout.hierarchical.mxHierarchicalLayout;
-import io.reactivex.rxjava3.core.Observable;
-import io.reactivex.rxjava3.core.ObservableEmitter;
-import io.reactivex.rxjava3.schedulers.Schedulers;
 import javax.swing.*;
-import javax.swing.border.TitledBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.io.File;
-import java.util.*;
+
+import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 import java.util.concurrent.TimeUnit;
 
-import com.mxgraph.swing.mxGraphComponent;
-import com.mxgraph.view.mxGraph;
-import it.unibo.rxjava.DependencyCollector;
-import it.unibo.vertx.reports.ClassDepsReport;
-
 public class DependencyAnalyserApp {
-
     private JFrame frame;
     private JTextField folderField;
     private JButton browseButton;
     private JButton startButton;
     private JLabel classesCountLabel;
     private JLabel depsCountLabel;
-    private mxGraph graph;
-    private Object parent;
-    private mxGraphComponent graphComponent;
-    private Map<String, Object> nodeMap = new HashMap<>();
-    private Set<String> existingEdges = new HashSet<>();
+    private GraphView graphView;
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new DependencyAnalyserApp().createAndShowGUI());
@@ -43,7 +27,7 @@ public class DependencyAnalyserApp {
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(1000, 700);
 
-        JPanel controlPanel = new JPanel(new BorderLayout(5,5));
+        JPanel controlPanel = new JPanel(new BorderLayout(5, 5));
         folderField = new JTextField();
         browseButton = new JButton("Browse...");
         browseButton.addActionListener(this::onBrowse);
@@ -53,32 +37,21 @@ public class DependencyAnalyserApp {
         startButton = new JButton("Start Analysis");
         startButton.addActionListener(this::onStart);
 
-        JPanel statsPanel = new JPanel(new GridLayout(1,2,10,10));
+        JPanel statsPanel = new JPanel(new GridLayout(1, 2, 10, 10));
         classesCountLabel = new JLabel("Classes: 0");
-        classesCountLabel.setBorder(new TitledBorder("Analyzed"));
         depsCountLabel = new JLabel("Dependencies: 0");
-        depsCountLabel.setBorder(new TitledBorder("Found"));
         statsPanel.add(classesCountLabel);
         statsPanel.add(depsCountLabel);
 
-        JPanel topPanel = new JPanel(new BorderLayout(5,5));
+        JPanel topPanel = new JPanel(new BorderLayout(5, 5));
         topPanel.add(controlPanel, BorderLayout.NORTH);
         topPanel.add(startButton, BorderLayout.CENTER);
         topPanel.add(statsPanel, BorderLayout.SOUTH);
 
-        // Initialize JGraphX
-        graph = new mxGraph();
-        parent = graph.getDefaultParent();
-        graph.getModel().beginUpdate();
-        try {
-            // nothing initially
-        } finally {
-            graph.getModel().endUpdate();
-        }
-        graphComponent = new mxGraphComponent(graph);
+        graphView = new GraphView();
 
         frame.getContentPane().add(topPanel, BorderLayout.NORTH);
-        frame.getContentPane().add(graphComponent, BorderLayout.CENTER);
+        frame.getContentPane().add(graphView.getComponent(), BorderLayout.CENTER);
         frame.setVisible(true);
     }
 
@@ -95,128 +68,31 @@ public class DependencyAnalyserApp {
         String root = folderField.getText();
         if (root.isEmpty()) return;
         startButton.setEnabled(false);
-        graph.getModel().beginUpdate();
-        try {
-            graph.removeCells(graph.getChildVertices(graph.getDefaultParent()));
-            nodeMap.clear();
-        } finally {
-            graph.getModel().endUpdate();
-        }
+
+        graphView.reset();
         classesCountLabel.setText("Classes: 0");
         depsCountLabel.setText("Dependencies: 0");
 
-        Observable.<File>create(emitter -> {
-                    scanDirectory(new File(root), emitter);
-                })
+        JavaFileScanner scanner = new JavaFileScanner();
+        JavaDependencyParser parser = new JavaDependencyParser();
+
+        scanner.scan(new File(root))
                 .subscribeOn(Schedulers.io())
-                .flatMap(this::parseAndCollect)
+                .flatMap(parser::parse)
                 .observeOn(Schedulers.single())
-                .concatMap(file -> Observable.just(file).delay(300, TimeUnit.MILLISECONDS))
-                .subscribe(result -> {
+                .concatMap(report -> Observable.just(report).delay(200, TimeUnit.MILLISECONDS))
+                .subscribe(report -> {
                     SwingUtilities.invokeLater(() -> {
-                        addNode(result.getClassName());
-                        result.getClassDependencies().forEach(dep -> {
-                            addNode(dep);
-                            addEdge(result.getClassName(), dep);
+                        graphView.addNode(report.getClassName());
+                        report.getClassDependencies().forEach(dep -> {
+                            graphView.addNode(dep);
+                            graphView.addEdge(report.getClassName(), dep);
                         });
-                        classesCountLabel.setText("Classes: " + nodeMap.size());
-                        depsCountLabel.setText("Dependencies: " + countEdges());
+                        classesCountLabel.setText("Classes: " + graphView.getNodeCount());
+                        depsCountLabel.setText("Dependencies: " + graphView.getEdgeCount());
                     });
                 }, err -> {
                     SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(frame, "Error: " + err.getMessage()));
                 }, () -> SwingUtilities.invokeLater(() -> startButton.setEnabled(true)));
     }
-
-    private void addNode(String node) {
-        if (!nodeMap.containsKey(node)) {
-            graph.getModel().beginUpdate();
-            try {
-                Object v = graph.insertVertex(parent, null, node, 0, 0, node.length()*10 + 10, 30);
-                nodeMap.put(node, v);
-            } finally {
-                graph.getModel().endUpdate();
-            }
-            applyLayout(); // Apply layout after adding the node
-        }
-    }
-    private void applyLayout() {
-        mxHierarchicalLayout layout = new mxHierarchicalLayout(graph);
-        layout.execute(parent);
-    }
-
-    private void addEdge(String from, String to) {
-        String edgeKey = from + "->" + to;
-        if (existingEdges.contains(edgeKey)) return;
-
-        Object v1 = nodeMap.get(from);
-        Object v2 = nodeMap.get(to);
-        if (v1 != null && v2 != null) {
-            graph.getModel().beginUpdate();
-            try {
-                graph.insertEdge(parent, null, "", v1, v2);
-                existingEdges.add(edgeKey);
-            } finally {
-                graph.getModel().endUpdate();
-            }
-        }
-    }
-
-    private int countEdges() {
-        return graph.getChildEdges(parent).length;
-    }
-
-    private void scanDirectory(File dir, ObservableEmitter<File> emitter) {
-        for (File file : Objects.requireNonNull(dir.listFiles())) {
-            if (file.isDirectory()) {
-                scanDirectory(file, emitter);
-            } else if (file.getName().endsWith(".java")) {
-                emitter.onNext(file);
-            }
-        }
-    }
-
-    static private void log(String msg) {
-        System.out.println("[ " + Thread.currentThread().getName() + "  ] " + msg);
-    }
-
-    private Observable<ClassDepsReport> parseAndCollect(File file) {
-        return Observable.create(emitter -> {
-            try {
-                log("Parsing file: " + file.getAbsolutePath());
-                CompilationUnit cu = StaticJavaParser.parse(file);
-
-                String className = cu.getPrimaryTypeName().orElse(file.getName());
-                ClassDepsReport report = new ClassDepsReport();
-                report.setClassName(className);
-
-                Observable<String> dependenciesObservable = Observable.create(depEmitter -> {
-                    DependencyCollector collector = new DependencyCollector();
-                    collector.visit(cu, depEmitter);
-                    depEmitter.onComplete();
-                });
-
-                log("Collecting dependencies...");
-
-                dependenciesObservable
-                        .concatMap(dep -> Observable.just(dep).delay(300, TimeUnit.MILLISECONDS)) // simula tempo reale
-                        .observeOn(Schedulers.single())
-                        .doOnNext(dep -> {
-                            report.addClassDependency(dep);
-                            SwingUtilities.invokeLater(() -> {
-                                addNode(className);
-                                addNode(dep);
-                                addEdge(className, dep);
-                                classesCountLabel.setText("Classes: " + nodeMap.size());
-                                depsCountLabel.setText("Dependencies: " + countEdges());
-                            });
-                        })
-                        .doOnComplete(() -> emitter.onNext(report))
-                        .subscribe();
-
-            } catch (Exception e) {
-                emitter.onError(e);
-            }
-        });
-    }
-
 }
