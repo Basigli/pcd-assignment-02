@@ -92,6 +92,7 @@ public class DependencyAnalyserApp {
         JavaDependencyParser parser = new JavaDependencyParser();
 
         scanner.scan(new File(root))
+                .concatMap(file -> Observable.just(file).delay(1000, TimeUnit.MILLISECONDS))
                 .doOnNext(file -> updateClassCountLabel())
                 .subscribeOn(Schedulers.io())
                 .flatMap(parser::parse)
