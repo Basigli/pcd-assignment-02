@@ -4,14 +4,13 @@ import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import it.unibo.vertx.DependecyAnalyserLib;
-import it.unibo.vertx.reports.ClassDepsReport;
 import it.unibo.vertx.reports.PackageDepsReport;
 
-public class PackageDepencyAnalyser extends AbstractVerticle {
+public class PackageDependencyAnalyser extends AbstractVerticle {
     private final Promise<PackageDepsReport> promise;
     private final String packageSrcFolder;
 
-    public PackageDepencyAnalyser(String packageSrcFolder, Promise<PackageDepsReport> promise) {
+    public PackageDependencyAnalyser(String packageSrcFolder, Promise<PackageDepsReport> promise) {
         this.promise = promise;
         this.packageSrcFolder = packageSrcFolder;
     }

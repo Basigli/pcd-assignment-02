@@ -7,7 +7,7 @@ import it.unibo.vertx.reports.ClassDepsReport;
 import it.unibo.vertx.reports.PackageDepsReport;
 import it.unibo.vertx.reports.ProjectDepsReport;
 import it.unibo.vertx.verticles.ClassDependencyAnalyser;
-import it.unibo.vertx.verticles.PackageDepencyAnalyser;
+import it.unibo.vertx.verticles.PackageDependencyAnalyser;
 import it.unibo.vertx.verticles.ProjectDependencyAnalyser;
 
 public class DependecyAnalyserLib {
@@ -20,7 +20,7 @@ public class DependecyAnalyserLib {
 
     public static Future<PackageDepsReport> getPackageDependencies(String packageSrcFolder, Vertx vertx) {
         Promise<PackageDepsReport> promise = Promise.promise();
-        vertx.deployVerticle(new PackageDepencyAnalyser(packageSrcFolder, promise));
+        vertx.deployVerticle(new PackageDependencyAnalyser(packageSrcFolder, promise));
         return promise.future();
     }
 
