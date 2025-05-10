@@ -26,34 +26,23 @@ public class ClassDependencyAnalyser extends AbstractVerticle {
 
         vertx.fileSystem().readFile(classSrcFile)
                 .onSuccess(buffer -> {
-                    vertx.executeBlocking(blockingPromise -> {
-                        try {
-                            // Parsing del codice sorgente
-                            CompilationUnit cu = StaticJavaParser.parse(buffer.toString());
+                    vertx.<ClassDepsReport>executeBlocking(() -> {
+                                CompilationUnit cu = StaticJavaParser.parse(buffer.toString());
+                                HashSet<String> dependencies = new HashSet<>();
+                                var visitor = new DependencyCollector();
+                                visitor.visit(cu, dependencies);
 
-                            // Colleziona le dipendenze
-                            HashSet<String> dependencies = new HashSet<>();
-                            var visitor = new DependencyCollector();
-                            visitor.visit(cu, dependencies);
+                                ClassDepsReport report = new ClassDepsReport();
+                                report.setClassName(classSrcFile);
+                                report.setClassDependencies(dependencies);
 
-                            // Costruzione del report
-                            ClassDepsReport report = new ClassDepsReport();
-
-                            report.setClassName(classSrcFile);
-                            report.setClassDependencies(dependencies);
-
-                            blockingPromise.complete(report);
-                        } catch (Exception e) {
-                            blockingPromise.fail(e);
-                        }
-                    }, res -> {
-                        if (res.succeeded()) {
-                            promise.complete((ClassDepsReport) res.result());
-                        } else {
-                            System.err.println("Parsing failed: " + res.cause().getMessage());
-                            promise.fail(res.cause());
-                        }
-                    });
+                                return report;
+                            }, false)
+                            .onSuccess(promise::complete)
+                            .onFailure(err -> {
+                                System.err.println("Parsing failed: " + err.getMessage());
+                                promise.fail(err);
+                            });
                 })
                 .onFailure(err -> {
                     System.err.println("File reading failed: " + err.getMessage());

@@ -21,7 +21,7 @@ public class App {
     public static void main(String[] args) {
         Vertx vertx = Vertx.vertx();
 
-        /*
+
         DependecyAnalyserLib.getClassDependencies(FILE_PATH, vertx).onComplete(result -> {
             if (result.succeeded()) {
                 System.out.println(result.result().toString());
@@ -29,8 +29,8 @@ public class App {
                 System.err.println("Failed to get class dependencies: " + result.cause());
             }
         });
-        */
-        /*
+
+
         DependecyAnalyserLib.getPackageDependencies(PACKAGE_PATH, vertx).onComplete(result -> {
             if (result.succeeded()) {
                 System.out.println(result.result().toString());
@@ -38,7 +38,7 @@ public class App {
                 System.err.println("Failed to get package dependencies: " + result.cause());
             }
         });
-        */
+
 
         DependecyAnalyserLib.getProjectDependencies(PROJECT_PATH, vertx).onComplete(result -> {
             if (result.succeeded()) {

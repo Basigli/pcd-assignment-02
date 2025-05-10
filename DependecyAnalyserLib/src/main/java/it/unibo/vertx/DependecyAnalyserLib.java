@@ -12,8 +12,6 @@ import it.unibo.vertx.verticles.ProjectDependencyAnalyser;
 
 public class DependecyAnalyserLib {
 
-
-
     public static Future<ClassDepsReport> getClassDependencies(String classSrcFile, Vertx vertx) {
         Promise<ClassDepsReport> promise = Promise.promise();
         vertx.deployVerticle(new ClassDependencyAnalyser(classSrcFile, promise));
