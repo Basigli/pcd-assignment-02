@@ -17,6 +17,7 @@ public class DependencyAnalyserApp {
     private JLabel classesCountLabel;
     private JLabel depsCountLabel;
     private GraphView graphView;
+    private int classNumber;
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new DependencyAnalyserApp().createAndShowGUI());
@@ -63,20 +64,35 @@ public class DependencyAnalyserApp {
         }
     }
 
+    private void setClassCountLabel(int count) {
+        classesCountLabel.setText("Classes: " + count);
+    }
 
+    private void updateClassCountLabel() {
+        classNumber++;
+        classesCountLabel.setText("Classes: " + classNumber);
+    }
+    private void setDepsCountLabel(int count) {
+        depsCountLabel.setText("Dependencies: " + count);
+    }
+
+    private void resetLabels() {
+        setClassCountLabel(0);
+        setDepsCountLabel(0);
+    }
     private void onStart(ActionEvent e) {
         String root = folderField.getText();
         if (root.isEmpty()) return;
         startButton.setEnabled(false);
 
         graphView.reset();
-        classesCountLabel.setText("Classes: 0");
-        depsCountLabel.setText("Dependencies: 0");
+        resetLabels();
 
         JavaFileScanner scanner = new JavaFileScanner();
         JavaDependencyParser parser = new JavaDependencyParser();
 
         scanner.scan(new File(root))
+                .doOnNext(file -> updateClassCountLabel())
                 .subscribeOn(Schedulers.io())
                 .flatMap(parser::parse)
                 .observeOn(Schedulers.single())
@@ -88,8 +104,7 @@ public class DependencyAnalyserApp {
                             graphView.addNode(dep);
                             graphView.addEdge(report.getClassName(), dep);
                         });
-                        classesCountLabel.setText("Classes: " + graphView.getNodeCount());
-                        depsCountLabel.setText("Dependencies: " + graphView.getEdgeCount());
+                        setDepsCountLabel(graphView.getEdgeCount());
                     });
                 }, err -> {
                     SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(frame, "Error: " + err.getMessage()));

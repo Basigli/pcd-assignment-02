@@ -25,7 +25,6 @@ public class JavaDependencyParser {
                 });
 
                 deps
-                        .concatMap(dep -> Observable.just(dep).delay(200, TimeUnit.MILLISECONDS))
                         .doOnNext(dep -> {
                             report.addClassDependency(dep);
                             ClassDepsReport classReport = new ClassDepsReport();
