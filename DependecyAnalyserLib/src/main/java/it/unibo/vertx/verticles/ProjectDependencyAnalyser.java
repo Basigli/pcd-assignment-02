@@ -26,24 +26,29 @@ public class ProjectDependencyAnalyser extends AbstractVerticle {
                     report.setProjectName(projectSrcFolder);
 
                     var futures = files.stream()
-                            .filter(file -> vertx.fileSystem().propsBlocking(file).isDirectory())
-                            .flatMap(file -> {
-                                // Call both getPackageDependencies and getProjectDependencies
-                                var packageFuture = DependecyAnalyserLib.getPackageDependencies(file, vertx)
-                                        .onSuccess(report::addProjectDependency)
-                                        .onFailure(err -> System.err.println("Failed to get package dependencies: " + err.getMessage()));
+                            .map(file -> vertx.fileSystem().props(file)
+                                    .compose(props -> {
+                                        if (props.isDirectory()) {
+                                            var packageFuture = DependecyAnalyserLib.getPackageDependencies(file, vertx)
+                                                    .onSuccess(report::addProjectDependency)
+                                                    .mapEmpty()
+                                                    .onFailure(err -> System.err.println("Failed to get package dependencies: " + err.getMessage()));
 
-                                var projectFuture = DependecyAnalyserLib.getProjectDependencies(file, vertx)
-                                        .onSuccess(dependencies -> {
-                                            dependencies.getProjectDependencies().forEach(dep -> {
-                                                report.addProjectDependency(dep);
-                                                System.out.println("Added project dependency: " + dep.getPackageName());
-                                            });
-                                        })
-                                        .onFailure(err -> System.err.println("Failed to get project dependencies: " + err.getMessage()));
+                                            var projectFuture = DependecyAnalyserLib.getProjectDependencies(file, vertx)
+                                                    .onSuccess(dependencies -> {
+                                                        dependencies.getProjectDependencies().forEach(dep -> {
+                                                            report.addProjectDependency(dep);
+                                                            System.out.println("Added project dependency: " + dep.getPackageName());
+                                                        });
+                                                    })
+                                                    .mapEmpty()
+                                                    .onFailure(err -> System.err.println("Failed to get project dependencies: " + err.getMessage()));
 
-                                return Stream.of(packageFuture, projectFuture);
-                            })
+                                            return Future.all(packageFuture, projectFuture).mapEmpty();
+                                        } else {
+                                            return Future.succeededFuture();
+                                        }
+                                    }))
                             .toList();
 
                     Future.all(futures)

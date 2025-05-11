@@ -14,13 +14,11 @@ import java.util.List;
 public class App {
 
     private static final String PACKAGE_PATH = "DependecyAnalyserLib/src/test/java/it/unibo";
-    // private static final String PROJECT_PATH = "DependecyAnalyserLib/main/java/it/unibo/vertx";
-    private static final String PROJECT_PATH = "DependecyAnalyserLib";
+    private static final String PROJECT_PATH = "DependecyAnalyserLib/src/test";
     private static final String FILE_PATH = "DependecyAnalyserLib/src/test/java/it/unibo/A.java";
 
     public static void main(String[] args) {
         Vertx vertx = Vertx.vertx();
-
 
         DependecyAnalyserLib.getClassDependencies(FILE_PATH, vertx).onComplete(result -> {
             if (result.succeeded()) {
